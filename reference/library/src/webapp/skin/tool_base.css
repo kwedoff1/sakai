@@ -987,3 +987,9 @@ ul.calendarLegend li{
     box-shadow:2px 2px 2px #cccccc;
     vertical-align:middle;
 }
+
+.borderGrayTodayMiddleBottom,.borderFullGray,.borderGrayMonth{
+	border-right:1px solid #000;
+	border-left:1px solid #000;
+	border-top:1px solid #000;
+	border-bottom:1px solid #000;}
