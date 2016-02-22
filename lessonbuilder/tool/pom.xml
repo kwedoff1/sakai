@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.sakaiproject.lessonbuilder</groupId>
         <artifactId>lessonbuilder</artifactId>
-        <version>11-SNAPSHOT</version>
+        <version>12-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -28,8 +28,8 @@
         </dependency>
 
         <dependency>
-            <groupId>org.tsugi</groupId>
-            <artifactId>tsugi-util</artifactId>
+            <groupId>org.sakaiproject.basiclti</groupId>
+            <artifactId>basiclti-util</artifactId>
             <version>${sakai.version}</version>
         </dependency>
 

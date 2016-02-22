@@ -1,5 +1,6 @@
 package org.sakaiproject.gradebookng.tool.panels;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.Collections;
@@ -24,6 +25,7 @@ import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.Radio;
 import org.apache.wicket.markup.html.form.RadioGroup;
 import org.apache.wicket.markup.html.form.TextField;
+import org.apache.wicket.markup.html.form.HiddenField;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.Panel;
@@ -53,10 +55,12 @@ public class SettingsCategoryPanel extends Panel {
 	boolean isDropHighest = false;
 	boolean isDropLowest = false;
 	boolean isKeepHighest = false;
+	boolean expanded = false;
 
-	public SettingsCategoryPanel(final String id, final IModel<GbSettings> model) {
+	public SettingsCategoryPanel(final String id, final IModel<GbSettings> model, final boolean expanded) {
 		super(id, model);
 		this.model = model;
+		this.expanded = expanded;
 	}
 
 	@Override
@@ -95,6 +99,7 @@ public class SettingsCategoryPanel extends Panel {
 			@Override
 			protected void onEvent(final AjaxRequestTarget ajaxRequestTarget) {
 				settingsCategoriesPanel.add(new AttributeModifier("class", "panel-collapse collapse in"));
+				expanded = true;
 			}
 		});
 		settingsCategoriesPanel.add(new AjaxEventBehavior("hidden.bs.collapse") {
@@ -103,8 +108,12 @@ public class SettingsCategoryPanel extends Panel {
 			@Override
 			protected void onEvent(final AjaxRequestTarget ajaxRequestTarget) {
 				settingsCategoriesPanel.add(new AttributeModifier("class", "panel-collapse collapse"));
+				expanded = false;
 			}
 		});
+		if (expanded) {
+			settingsCategoriesPanel.add(new AttributeModifier("class", "panel-collapse collapse in"));
+		}
 		add(settingsCategoriesPanel);
 
 		// category types
@@ -233,6 +242,9 @@ public class SettingsCategoryPanel extends Panel {
 					SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories().add(stubCategoryDefinition());
 				}
 
+				// reinitialize any custom behaviour
+				target.appendJavaScript("new GradebookCategorySettings($('#settingsCategories'));");
+
 				target.add(categoriesWrap);
 			}
 		});
@@ -251,6 +263,14 @@ public class SettingsCategoryPanel extends Panel {
 				SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories()) {
 
 			private static final long serialVersionUID = 1L;
+
+			/*@Override
+			public final List<CategoryDefinition> getList() {
+				List<CategoryDefinition> categories = super.getList();
+
+				Collections.sort(categories, businessService.getCategoryOrderComparator());
+				return categories;
+			}*/
 
 			@Override
 			protected void populateItem(final ListItem<CategoryDefinition> item) {
@@ -369,6 +389,11 @@ public class SettingsCategoryPanel extends Panel {
 						final CategoryDefinition current = item.getModelObject();
 
 						SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories().remove(current);
+						int categoryIndex = 0;
+						for (CategoryDefinition category : SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories()) {
+							category.setCategoryOrder(Integer.valueOf(categoryIndex));
+							categoryIndex++;
+						}
 
 						// indicate to the listview that its model has changed and to rerender correctly
 						lv.modelChanged();
@@ -378,10 +403,25 @@ public class SettingsCategoryPanel extends Panel {
 
 						// update running total
 						updateRunningTotal(target, runningTotal, runningTotalMessage);
+
+						// reinitialize any custom behaviour
+						target.appendJavaScript("new GradebookCategorySettings($('#settingsCategories'));");
 					}
 				};
 				remove.setDefaultFormProcessing(false);
 				item.add(remove);
+
+				final HiddenField<Integer> categoryOrderField = new HiddenField<Integer>("categoryOrder", new PropertyModel<Integer>(category, "categoryOrder"));
+			/*	categoryOrderField.add(new AjaxFormComponentUpdatingBehavior("orderupdate.sakai") {
+					private static final long serialVersionUID = 1L;
+
+					@Override
+					protected void onUpdate(final AjaxRequestTarget target) {
+						Integer categoryOrder = categoryOrderField.getValue();
+						
+					}
+				});*/
+				item.add(categoryOrderField);
 			}
 
 			@Override
@@ -421,6 +461,9 @@ public class SettingsCategoryPanel extends Panel {
 				// add a new empty category to the model
 				SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories().add(stubCategoryDefinition());
 				target.add(categoriesWrap);
+
+				// reinitialize any custom behaviour
+				target.appendJavaScript("new GradebookCategorySettings($('#settingsCategories'));");
 			}
 		};
 		addCategory.setDefaultFormProcessing(false);
@@ -438,6 +481,9 @@ public class SettingsCategoryPanel extends Panel {
 		cd.setExtraCredit(false);
 		cd.setWeight(new Double(0));
 		cd.setAssignmentList(Collections.<Assignment> emptyList());
+
+		GbSettings settings = (GbSettings) SettingsCategoryPanel.this.model.getObject();
+		cd.setCategoryOrder(settings.getGradebookInformation().getCategories().size());
 		return cd;
 	}
 
@@ -470,7 +516,7 @@ public class SettingsCategoryPanel extends Panel {
 			try {
 				d = Double.valueOf(value) / 100;
 			} catch (final NumberFormatException e) {
-				throw new ConversionException(e);
+				throw new ConversionException(e).setResourceKey("settingspage.update.failure.categoryweightnumber");
 			}
 
 			// to string for the rounding/truncation
@@ -513,20 +559,21 @@ public class SettingsCategoryPanel extends Panel {
 
 		final List<CategoryDefinition> categories = SettingsCategoryPanel.this.model.getObject().getGradebookInformation().getCategories();
 
-		Double total = new Double(0);
+		BigDecimal total = BigDecimal.ZERO;
 		for (final CategoryDefinition categoryDefinition : categories) {
 
-			Double weight = categoryDefinition.getWeight();
+			BigDecimal weight = BigDecimal.valueOf(categoryDefinition.getWeight());
 			if (weight == null) {
-				weight = new Double(0);
+				weight = BigDecimal.ZERO;
 			}
 
 			if (!categoryDefinition.isExtraCredit()) {
-				total += weight;
+				total = total.add(weight);
 			}
 		}
 
-		if (total.equals(new Double(1))) {
+		// if comparison passes, we have '1' as the value
+		if (total.compareTo(BigDecimal.ONE) == 0) {
 			runningTotal.add(new AttributeModifier("class", "text-success"));
 			runningTotalMessage.setVisible(false);
 		} else {
@@ -534,7 +581,7 @@ public class SettingsCategoryPanel extends Panel {
 			runningTotalMessage.setVisible(true);
 		}
 
-		runningTotal.setDefaultModel(Model.of(FormatHelper.formatDoubleAsPercentage(total * 100)));
+		runningTotal.setDefaultModel(Model.of(FormatHelper.formatDoubleAsPercentage(total.doubleValue() * 100)));
 	}
 
 	/**
@@ -549,5 +596,9 @@ public class SettingsCategoryPanel extends Panel {
 		updateRunningTotal(runningTotal, runningTotalMessage);
 		target.add(runningTotal);
 		target.add(runningTotalMessage);
+	}
+
+	public boolean isExpanded() {
+		return expanded;
 	}
 }

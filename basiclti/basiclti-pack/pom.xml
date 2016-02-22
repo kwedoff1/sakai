@@ -5,7 +5,7 @@
     <parent>
         <artifactId>basiclti</artifactId>
         <groupId>org.sakaiproject.basiclti</groupId>
-        <version>11-SNAPSHOT</version>
+        <version>12-SNAPSHOT</version>
     </parent>
     
     <name>BasicLTI Component Package (basiclti-pack)</name>
@@ -24,8 +24,8 @@
     
     <dependencies>
         <dependency>
-            <groupId>org.tsugi</groupId>
-            <artifactId>tsugi-util</artifactId>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>basiclti-util</artifactId>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
